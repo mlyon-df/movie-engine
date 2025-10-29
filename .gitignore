@@ -205,3 +205,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Files not related to python at all
+.DS_Store
+
+# Raw data should not be kept in version control
+movie-engine-data/raw/**
