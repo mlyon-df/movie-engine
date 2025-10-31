@@ -23,8 +23,11 @@ To get the data for processing, download the datasets and place them in the `mov
 - MovieLens 32M Dataset [link](https://files.grouplens.org/datasets/movielens/ml-32m.zip)
 - Other MovieLens datasets can be found [here](https://grouplens.org/datasets/movielens/).
 
-## Organization
+# File structure
+In addition to the directories that are part of the repo, the following need to exist:
+
 - `movie-engine-data/`: Contains datasets used for training and evaluation.
 - `movie-engine-data/raw/`: Raw, unprocessed data files.
 - `movie-engine-data/processed/`: Processed data files ready for use.
+- `movie-engine-data/models/`: Models (this may exists as there may be models)
 
