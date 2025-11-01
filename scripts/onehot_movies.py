@@ -23,6 +23,7 @@ import csv
 import os
 import sys
 from typing import List
+from progress import ProgressBar, wrap_iter
 
 
 # MovieLens predefined genre list. Keep the exact strings so CSV
@@ -66,22 +67,24 @@ def write_onehot(input_path: str, output_path: str, genre_list: List[str]) -> in
         writer.writeheader()
 
         row_count = 0
-        for row in reader:
-            out_row = {k: row.get(k, "") for k in other_fields}
-            raw = row.get("genres", "")
-            present = set(g.strip() for g in raw.split("|") if g.strip())
-            # If the dataset explicitly uses the placeholder, treat that as the
-            # only genre present so the corresponding column will be 1 and
-            # others 0. Otherwise keep the parsed genres as-is.
-            lowered = {g.lower() for g in present}
-            if "(no genres listed)" in lowered:
-                present = {"(no genres listed)"}
+        # Show progress while processing rows
+        with ProgressBar(prefix="Processing") as pb:
+            for row in wrap_iter(reader, progress=pb):
+                out_row = {k: row.get(k, "") for k in other_fields}
+                raw = row.get("genres", "")
+                present = set(g.strip() for g in raw.split("|") if g.strip())
+                # If the dataset explicitly uses the placeholder, treat that as the
+                # only genre present so the corresponding column will be 1 and
+                # others 0. Otherwise keep the parsed genres as-is.
+                lowered = {g.lower() for g in present}
+                if "(no genres listed)" in lowered:
+                    present = {"(no genres listed)"}
 
-            for g in genre_list:
-                out_row[g] = "1" if g in present else "0"
+                for g in genre_list:
+                    out_row[g] = "1" if g in present else "0"
 
-            writer.writerow(out_row)
-            row_count += 1
+                writer.writerow(out_row)
+                row_count += 1
 
     return row_count
 

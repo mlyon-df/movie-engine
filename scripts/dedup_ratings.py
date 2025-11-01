@@ -17,7 +17,7 @@ Options:
  - --timestamp-col: name of timestamp column (default: timestamp)
  - --rating-col: name of rating value column (default: rating)
  - --keep-order: write rows in the same order as their newest timestamp occurrences (default: arbitrary) 
- 
+
 Notes:
 - For very large files that don't fit in memory, consider external sort
   by (userId,movieId) and then keeping the last entry per group.
@@ -30,6 +30,9 @@ import csv
 import os
 import sys
 from typing import Dict, Tuple
+
+# Progress bar utility used by multiple scripts
+from progress import ProgressBar, wrap_iter
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -85,22 +88,25 @@ def dedup_ratings(inpath: str, outpath: str, user_col: str, item_col: str, ts_co
         if user_col not in reader.fieldnames or item_col not in reader.fieldnames or ts_col not in reader.fieldnames or rating_col not in reader.fieldnames:
             raise ValueError(f"Missing expected columns. Available: {reader.fieldnames}")
 
-        for row in reader:
-            total += 1
-            user = row.get(user_col, "")
-            item = row.get(item_col, "")
-            ts_raw = row.get(ts_col, "")
-            ts = to_int_safe(ts_raw)
+        # Wrap the CSV reader so we show progress while scanning rows. Use a
+        # context manager to ensure the final bar is drawn.
+        with ProgressBar(prefix="Reading") as pbr:
+            for row in wrap_iter(reader, progress=pbr):
+                total += 1
+                user = row.get(user_col, "")
+                item = row.get(item_col, "")
+                ts_raw = row.get(ts_col, "")
+                ts = to_int_safe(ts_raw)
 
-            key = (user, item)
-            entry = best.get(key)
-            if entry is None:
-                best[key] = (ts, row)
-            else:
-                existing_ts, _ = entry
-                # keep the row with the greater (newer) timestamp
-                if ts >= existing_ts:
+                key = (user, item)
+                entry = best.get(key)
+                if entry is None:
                     best[key] = (ts, row)
+                else:
+                    existing_ts, _ = entry
+                    # keep the row with the greater (newer) timestamp
+                    if ts >= existing_ts:
+                        best[key] = (ts, row)
 
     # prepare to write
     os.makedirs(os.path.dirname(outpath), exist_ok=True)
@@ -125,8 +131,11 @@ def dedup_ratings(inpath: str, outpath: str, user_col: str, item_col: str, ts_co
     with open(outpath, "w", newline="", encoding="utf-8") as outfh:
         writer = csv.DictWriter(outfh, fieldnames=header)
         writer.writeheader()
-        for _, (ts, row) in items:
-            writer.writerow(row)
+        # Show progress during the write phase; we know the total number of
+        # items to write so show a percentage bar.
+        with ProgressBar(total=len(items), prefix="Writing") as pbw:
+            for _, (ts, row) in wrap_iter(items, progress=pbw):
+                writer.writerow(row)
 
     kept = len(best)
     return kept, total

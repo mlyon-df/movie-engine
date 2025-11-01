@@ -28,6 +28,7 @@ import csv
 import os
 import sys
 from typing import Dict
+from progress import ProgressBar, wrap_iter
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -35,7 +36,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--input", required=True, help="Path to input ratings CSV")
     p.add_argument("--output", required=True, help="Path to write filtered CSV")
     p.add_argument("--user-col", default="userId", help="Column name for user id (default: userId)")
-    p.add_argument("--threshold", type=int, default=30, help="Minimum number of ratings required to keep a user's ratings (default: 30)")
+    p.add_argument("--threshold", type=int, default=20, help="Minimum number of ratings required to keep a user's ratings (default: 30)")
     p.add_argument("--keep-order", action="store_true", help="Preserve original order in output (default: write in streaming order)")
     return p.parse_args(argv)
 
@@ -48,9 +49,11 @@ def count_users(inpath: str, user_col: str) -> Dict[str, int]:
             raise ValueError("Input CSV has no header")
         if user_col not in reader.fieldnames:
             raise ValueError(f"user column '{user_col}' not found in header: {reader.fieldnames}")
-        for row in reader:
-            uid = row.get(user_col, "")
-            counts[uid] += 1
+        # show progress while counting users
+        with ProgressBar(prefix="Counting") as pb:
+            for row in wrap_iter(reader, progress=pb):
+                uid = row.get(user_col, "")
+                counts[uid] += 1
     return counts
 
 
@@ -68,16 +71,9 @@ def filter_users(inpath: str, outpath: str, user_col: str, threshold: int, keep_
         writer = csv.DictWriter(outfh, fieldnames=fieldnames)
         writer.writeheader()
 
-        if keep_order:
-            # streaming write preserves order naturally
-            for row in reader:
-                total += 1
-                if row.get(user_col, "") in keep_users:
-                    writer.writerow(row)
-                    kept += 1
-        else:
-            # If not keeping order we still stream; kept users are same
-            for row in reader:
+        # Show progress while filtering/writing rows
+        with ProgressBar(prefix="Filtering") as pbf:
+            for row in wrap_iter(reader, progress=pbf):
                 total += 1
                 if row.get(user_col, "") in keep_users:
                     writer.writerow(row)
