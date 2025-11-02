@@ -209,5 +209,6 @@ __marimo__/
 # Files not related to python at all
 .DS_Store
 
-# Raw data should not be kept in version control
-movie-engine-data/raw/**
+# Movie Engine generated data - keep models, ignore the rest
+movie-engine-data/**/
+!movie-engine-data/models/
