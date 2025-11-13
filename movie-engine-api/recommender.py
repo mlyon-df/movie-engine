@@ -6,6 +6,7 @@ Core recommendation logic using Item-Based Collaborative Filtering.
 import pandas as pd
 import numpy as np
 import logging
+from tmdb_client import TMDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class RecommendationEngine:
     Implements hybrid onboarding strategy for new users.
     """
     
-    def __init__(self, item_similarity_df, movies_df, ratings_df):
+    def __init__(self, item_similarity_df, movies_df, ratings_df, links_df=None, tmdb_api_key=None):
         """
         Initialize the recommendation engine.
         
@@ -24,10 +25,20 @@ class RecommendationEngine:
         - item_similarity_df: Pre-computed item similarity matrix
         - movies_df: Movies dataframe with metadata
         - ratings_df: Historical ratings dataframe
+        - links_df: Links dataframe with TMDB IDs (optional)
+        - tmdb_api_key: TMDB API key (optional, can be set via env var)
         """
         self.item_similarity_df = item_similarity_df
         self.movies_df = movies_df
         self.ratings_df = ratings_df
+        self.links_df = links_df
+        
+        # Initialize TMDB client if links are provided
+        self.tmdb_client = None
+        if links_df is not None:
+            self.tmdb_client = TMDBClient(api_key=tmdb_api_key)
+            logger.info("TMDB client initialized")
+        
         logger.info("Recommendation engine initialized")
     
     def predict_rating(self, movie_id, user_ratings, k=10):
@@ -72,7 +83,7 @@ class RecommendationEngine:
         - n: Number of movies to return
         
         Returns:
-        - DataFrame with popular movies
+        - DataFrame with popular movies (including TMDB data)
         """
         popular = self.ratings_df.groupby('movieId').agg({
             'rating': ['mean', 'count']
@@ -86,6 +97,9 @@ class RecommendationEngine:
         result = self.movies_df[self.movies_df['movieId'].isin(popular['movieId'])][['movieId', 'title']].merge(
             popular[['movieId', 'avg_rating']], on='movieId'
         ).rename(columns={'avg_rating': 'predicted_rating'})
+        
+        # Enrich with TMDB data
+        result = self._enrich_with_tmdb(result)
         
         return result
     
@@ -145,12 +159,19 @@ class RecommendationEngine:
             
             # Combine and deduplicate
             combined = pd.concat([personalized, popular]).drop_duplicates('movieId')
+            
+            # Enrich with TMDB data
+            combined = self._enrich_with_tmdb(combined)
+            
             return combined.head(n)
         
         # Case 3: Sufficient ratings (5+) - fully personalized
         logger.info(f"{num_ratings} ratings provided. Generating fully personalized recommendations.")
         predictions_df = predictions_df.sort_values('predicted_rating', ascending=False).head(n)
         recommendations = self.movies_df[['movieId', 'title']].merge(predictions_df, on='movieId')
+        
+        # Enrich with TMDB data
+        recommendations = self._enrich_with_tmdb(recommendations)
         
         return recommendations
     
@@ -163,11 +184,11 @@ class RecommendationEngine:
         - n: Number of similar movies to return
         
         Returns:
-        - DataFrame with similar movies and similarity scores
+        - DataFrame with similar movies, similarity scores, and TMDB data
         """
         if movie_id not in self.item_similarity_df.columns:
             logger.warning(f"Movie {movie_id} not found in similarity matrix")
-            return pd.DataFrame(columns=['movieId', 'title', 'similarity'])
+            return pd.DataFrame(columns=['movieId', 'title', 'similarity', 'poster_url', 'overview'])
         
         # Get similar movies
         similar_movies = self.item_similarity_df[movie_id].sort_values(ascending=False)[1:n+1]
@@ -183,4 +204,52 @@ class RecommendationEngine:
                     'similarity': similarity
                 })
         
-        return pd.DataFrame(results)
+        results_df = pd.DataFrame(results)
+        
+        # Enrich with TMDB data
+        if len(results_df) > 0:
+            results_df = self._enrich_with_tmdb(results_df)
+        else:
+            results_df['poster_url'] = None
+            results_df['overview'] = None
+        
+        return results_df
+    
+    def _enrich_with_tmdb(self, recommendations_df):
+        """
+        Enrich recommendations with TMDB data (poster URL and overview).
+        
+        Parameters:
+        - recommendations_df: DataFrame with movieId, title, and predicted_rating
+        
+        Returns:
+        - Enhanced DataFrame with poster_url and overview columns
+        """
+        if self.tmdb_client is None or self.links_df is None:
+            # If TMDB client not available, add None columns
+            recommendations_df['poster_url'] = None
+            recommendations_df['overview'] = None
+            return recommendations_df
+        
+        # Merge with links to get TMDB IDs
+        enriched = recommendations_df.merge(
+            self.links_df[['movieId', 'tmdbId']], 
+            on='movieId', 
+            how='left'
+        )
+        
+        # Fetch TMDB data for each movie
+        tmdb_data = []
+        for _, row in enriched.iterrows():
+            tmdb_id = row.get('tmdbId')
+            tmdb_info = self.tmdb_client.enrich_movie_data(row['movieId'], tmdb_id)
+            tmdb_data.append(tmdb_info)
+        
+        # Add TMDB columns
+        enriched['poster_url'] = [d['poster_url'] for d in tmdb_data]
+        enriched['overview'] = [d['overview'] for d in tmdb_data]
+        
+        # Drop tmdbId column (internal use only)
+        enriched = enriched.drop(columns=['tmdbId'], errors='ignore')
+        
+        return enriched

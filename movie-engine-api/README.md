@@ -9,6 +9,7 @@ FastAPI-based REST API for movie recommendations using Item-Based Collaborative 
   - 0 ratings: Popular movies
   - 1-4 ratings: Blend of personalized + popular
   - 5+ ratings: Fully personalized recommendations
+- **TMDB Integration**: Enriches recommendations with movie posters and overviews from The Movie Database
 - **FastAPI**: Modern, fast, with automatic interactive documentation
 - **Lambda-ready**: Uses Mangum adapter for AWS Lambda deployment
 
@@ -19,10 +20,13 @@ movie-engine-api/
 ├── main.py              # FastAPI application and endpoints
 ├── model_loader.py      # Loads and caches the ML model
 ├── recommender.py       # Recommendation engine logic
+├── tmdb_client.py       # TMDB API integration
 ├── requirements.txt     # Python dependencies
 ├── run_local.py         # Local development server
 ├── test_api.py          # API testing script
-└── README.md           # This file
+├── test_tmdb.py         # TMDB integration test
+├── TMDB_SETUP.md        # TMDB configuration guide
+└── README.md            # This file
 ```
 
 ## Prerequisites
@@ -49,6 +53,18 @@ pip install -r requirements.txt
 ```
 
 ## Running Locally
+
+### Configure TMDB API Key (Optional)
+
+To enable movie posters and overviews, set your TMDB API key:
+
+```bash
+export TMDB_API_KEY="your_api_key_here"
+```
+
+See [TMDB_SETUP.md](TMDB_SETUP.md) for detailed instructions on obtaining and configuring a TMDB API key.
+
+**Note:** The API works without a TMDB key, but `poster_url` and `overview` fields will be `null`.
 
 ### Start the API server:
 
@@ -149,7 +165,9 @@ Get movie recommendations based on user ratings.
     {
       "movieId": 318,
       "title": "Shawshank Redemption, The (1994)",
-      "predicted_rating": 4.85
+      "predicted_rating": 4.85,
+      "poster_url": "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
+      "overview": "Framed in the 1940s for the double murder of his wife and her lover, upstanding banker Andy Dufresne begins a new life at the Shawshank prison..."
     },
     ...
   ],
@@ -157,6 +175,8 @@ Get movie recommendations based on user ratings.
   "strategy": "personalized"
 }
 ```
+
+**Note:** `poster_url` and `overview` are only populated when TMDB_API_KEY is configured.
 
 **Strategy Types:**
 - `popular`: Used when no ratings provided (cold start)
@@ -204,6 +224,7 @@ See the CDK stack in `/infra/movie_engine_api_stack.py` for reference configurat
 
 Configure in Lambda:
 - `S3_BUCKET_NAME`: S3 bucket name (default: `movie-engine-data`)
+- `TMDB_API_KEY`: The Movie Database API key (optional, for poster/overview data)
 - Lambda automatically sets `AWS_LAMBDA_FUNCTION_NAME` for environment detection
 
 ### Performance Notes

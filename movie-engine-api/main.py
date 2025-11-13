@@ -49,7 +49,8 @@ def get_recommendation_engine():
         recommendation_engine = RecommendationEngine(
             item_similarity_df=model_loader.item_similarity_df,
             movies_df=model_loader.movies_df,
-            ratings_df=model_loader.ratings_df
+            ratings_df=model_loader.ratings_df,
+            links_df=model_loader.links_df
         )
         logger.info("Recommendation engine initialized successfully!")
     
@@ -83,6 +84,14 @@ class MovieRecommendation(BaseModel):
     movieId: int
     title: str
     predicted_rating: float
+    poster_url: Optional[str] = Field(
+        default=None,
+        description="URL to movie poster from TMDB"
+    )
+    overview: Optional[str] = Field(
+        default=None,
+        description="Movie overview/description from TMDB"
+    )
 
 
 class RecommendationResponse(BaseModel):
@@ -164,7 +173,9 @@ async def get_recommendations(request: RecommendationRequest):
             MovieRecommendation(
                 movieId=int(row['movieId']),
                 title=row['title'],
-                predicted_rating=float(row['predicted_rating'])
+                predicted_rating=float(row['predicted_rating']),
+                poster_url=row.get('poster_url'),
+                overview=row.get('overview')
             )
             for _, row in recommendations_df.iterrows()
         ]
