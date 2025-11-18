@@ -1,0 +1,272 @@
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  z-index: 1500;
+}
+
+.drawer-overlay-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 85%;
+  max-width: 400px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.5);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  z-index: 1600;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drawer-open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.drawer-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.drawer-close-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.drawer-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.drawer-close-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  min-height: 0;
+}
+
+.drawer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: #a0a0a0;
+}
+
+.drawer-empty p {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.drawer-empty-hint {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.ratings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rating-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  transition: background 0.2s ease;
+}
+
+.rating-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rating-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rating-item-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rating-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #a0a0a0;
+}
+
+.rating-item-year {
+  color: #a0a0a0;
+}
+
+.rating-item-separator {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.rating-item-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rating-item-remove {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.rating-item-remove:hover {
+  background: rgba(231, 76, 60, 0.3);
+}
+
+.rating-item-remove:active {
+  transform: scale(0.9);
+}
+
+.rating-item-remove svg {
+  width: 16px;
+  height: 16px;
+}
+
+.drawer-footer {
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.clear-all-btn {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: 2px solid #e74c3c;
+  border-radius: 8px;
+  background-color: transparent;
+  color: #e74c3c;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.clear-all-btn:hover {
+  background-color: rgba(231, 76, 60, 0.1);
+}
+
+.clear-all-btn:active {
+  transform: scale(0.98);
+}
+
+/* Scrollbar styling */
+.drawer-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.drawer-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.drawer-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.drawer-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .drawer {
+    width: 90%;
+  }
+
+  .drawer-header {
+    padding: 1rem;
+  }
+
+  .drawer-title {
+    font-size: 1.25rem;
+  }
+
+  .drawer-content {
+    padding: 0.75rem;
+  }
+
+  .rating-item {
+    padding: 0.75rem;
+  }
+
+  .rating-item-title {
+    font-size: 0.9rem;
+  }
+
+  .rating-item-meta {
+    font-size: 0.8rem;
+  }
+
+  .drawer-footer {
+    padding: 1rem;
+  }
+}
