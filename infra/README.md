@@ -1,173 +1,221 @@
 # Movie Engine Infrastructure
 
-AWS CDK deployment for the Movie Recommendation API.
+AWS CDK infrastructure for deploying the Movie Recommendation System, including both the backend API and frontend web application.
+
+## Overview
+
+This directory contains AWS CDK stacks and deployment scripts for a complete movie recommendation system:
+
+- **Backend API**: Lambda-based FastAPI application with API Gateway
+- **Frontend Web App**: React SPA hosted on S3
+- **Data Storage**: S3 bucket for ML models and datasets
+
+## Architecture
+
+```
+┌─────────────────┐
+│   React SPA     │
+│  (S3 Bucket)    │
+└────────┬────────┘
+         │ HTTP
+         ▼
+┌─────────────────┐
+│  API Gateway    │
+│   (HTTP API)    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐      ┌─────────────────┐
+│  Lambda         │─────▶│  S3 Bucket      │
+│  FastAPI App    │      │  Model Files    │
+└─────────────────┘      └─────────────────┘
+```
+
+## Files
+
+- **`app.py`**: Main CDK application that synthesizes both stacks
+- **`movie_engine_api_stack.py`**: Backend API infrastructure (Lambda, API Gateway, S3)
+- **`movie_engine_frontend_stack_simple.py`**: Frontend infrastructure (S3 website hosting)
+- **`movie_engine_frontend_stack.py`**: Alternative frontend with CloudFront (optional)
+- **`deploy_frontend.sh`**: Automated frontend deployment script
+- **`generate_config.sh`**: Generate runtime configuration file
+- **`show_config.sh`**: Display current configuration
+- **`requirements.txt`**: CDK Python dependencies
+- **`cdk.json`**: CDK configuration
 
 ## Prerequisites
 
-- [AWS CDK](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html) installed
-- AWS credentials configured
-- Python 3.8+
+- **AWS CLI** configured with credentials
+- **AWS CDK** v2 installed (`npm install -g aws-cdk`)
+- **Python 3.8+** for CDK
+- **Node.js 18+** for frontend build
+- **AWS Account** with appropriate permissions
 
-## Setup
+## Quick Start - Full Deployment
+
+Deploy both backend and frontend in one go:
 
 ```bash
+# 1. Install CDK dependencies
 cd infra
-
-# Create virtual environment (optional but recommended)
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
+
+# 2. Bootstrap CDK (first time only)
+cdk bootstrap
+
+# 3. Deploy backend API
+cdk deploy MovieEngineAPIStack
+
+# 4. Upload model files to S3
+aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models/
+aws s3 sync ../movie-engine-data/processed s3://movie-engine-data/processed/
+
+# 5. Deploy frontend (automatically configures API URL)
+./deploy_frontend.sh
 ```
 
-## What Gets Deployed
+Your application is now live! The deployment script will output:
+- **API URL**: Use for testing the backend
+- **Website URL**: Access your frontend application
 
-- **S3 Bucket** (`movie-engine-data`): Stores model files and data
-- **Lambda Function** (`movie-recommendation-api`): FastAPI application
-  - 3GB memory (for large similarity matrix)
-  - 60 second timeout (for S3 cold starts)
-  - Python 3.11 runtime
-- **HTTP API Gateway**: Public API endpoint
-- **IAM Roles**: Lambda execution role with S3 read permissions
-- **CloudWatch Logs**: API logs with 1-week retention
+## Deployment Guides
 
-## Deployment Steps
+### Backend API Deployment
 
-### 1. Bootstrap CDK (first time only)
+For detailed backend deployment instructions, including:
+- Model file upload procedures
+- Lambda configuration options
+- API testing and monitoring
+- Troubleshooting
+
+See **[BACKEND_DEPLOYMENT.md](./BACKEND_DEPLOYMENT.md)**
+
+### Frontend Deployment
+
+For detailed frontend deployment instructions, including:
+- API URL configuration methods
+- Alternative deployment options
+- CloudFront setup (optional)
+- SPA routing configuration
+
+See **[FRONTEND_DEPLOYMENT.md](./FRONTEND_DEPLOYMENT.md)**
+
+## Deployment Options
+
+### Option 1: Automated Deployment (Recommended)
+
+Use the provided script for seamless deployment:
 
 ```bash
-cdk bootstrap aws://ACCOUNT-NUMBER/REGION
+# Deploy backend first
+cdk deploy MovieEngineAPIStack
+
+# Deploy frontend with automatic API URL configuration
+./deploy_frontend.sh
 ```
 
-### 2. Upload Model Files to S3
+### Option 2: Independent Stack Deployment
 
-Before deploying, upload your model files. The CDK will create the bucket if it doesn't exist, but you need to populate it:
+Deploy stacks independently for more control:
 
 ```bash
-# Deploy the stack first to create the bucket
-cdk deploy
+# Backend only
+cdk deploy MovieEngineAPIStack
 
-# Then upload model files
-aws s3 cp ../movie-engine-data/models/item_similarity_matrix.pkl \
-  s3://movie-engine-data/models/item_similarity_matrix.pkl
+# Frontend only
+cdk deploy MovieEngineFrontendStack
 
-aws s3 cp ../movie-engine-data/models/user_item_matrix.pkl \
-  s3://movie-engine-data/models/user_item_matrix.pkl
-
-aws s3 cp ../movie-engine-data/models/item_based_metadata.json \
-  s3://movie-engine-data/models/item_based_metadata.json
-
-aws s3 cp ../movie-engine-data/processed/ml-100k/movies.csv \
-  s3://movie-engine-data/processed/ml-100k/movies.csv
-
-aws s3 cp ../movie-engine-data/processed/ml-100k/ratings.csv \
-  s3://movie-engine-data/processed/ml-100k/ratings.csv
+# Then manually build and sync frontend
+cd ../movie-engine-fe
+npm run build
+aws s3 sync dist/ s3://movie-engine-frontend/ --delete
 ```
 
-Or use the sync command:
-```bash
-aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models
-aws s3 sync ../movie-engine-data/processed s3://movie-engine-data/processed
-```
+### Option 3: Deploy All Stacks Together
 
-### 3. Deploy the Stack
+Deploy everything at once:
 
 ```bash
-# See what will be deployed
-cdk diff
-
-# Deploy
-cdk deploy
-
-# The output will include:
-# - API Gateway URL
-# - S3 Bucket Name
-# - Lambda Function Name
+cdk deploy --all
 ```
 
-### 4. Test the Deployment
+Note: You'll still need to upload model files and build the frontend separately.
+
+## Configuration Management
+
+### API URL Configuration
+
+The frontend needs the API Gateway URL. The deployment script handles this automatically:
 
 ```bash
-# Get the API URL from outputs or CloudFormation
-export API_URL=$(aws cloudformation describe-stacks \
-  --stack-name MovieEngineAPIStack \
-  --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
-  --output text)
-
-# Test health check
-curl $API_URL/health
-
-# Test recommendations
-curl -X POST $API_URL/recommendations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_ratings": {"1": 5.0, "50": 4.5},
-    "n": 5
-  }'
+./deploy_frontend.sh
 ```
 
-## CDK Commands
-
+**Manual configuration** (if needed):
 ```bash
-# List all stacks
-cdk ls
+# Get API URL from CloudFormation
+API_URL=$(aws cloudformation describe-stacks \
+    --stack-name MovieEngineAPIStack \
+    --query "Stacks[0].Outputs[?ExportName=='MovieEngineApiUrl'].OutputValue" \
+    --output text)
 
-# Show the CloudFormation template
-cdk synth
-
-# Compare deployed stack with current state
-cdk diff
-
-# Deploy stack
-cdk deploy
-
-# Destroy stack (keeps S3 bucket by default)
-cdk destroy
+# Set for frontend build
+cd ../movie-engine-fe
+echo "VITE_API_URL=$API_URL" > .env
+npm run build
 ```
-
-## Configuration
 
 ### Environment Variables
 
-Set in `movie_engine_api_stack.py` Lambda function environment:
+Check current configuration:
+```bash
+./show_config.sh
+```
 
-- `S3_BUCKET_NAME`: S3 bucket for model files (default: `movie-engine-data`)
-- `LOG_LEVEL`: Logging level (default: `INFO`)
+Generate runtime config file:
+```bash
+./generate_config.sh
+```
 
-### Lambda Configuration
+## Testing Your Deployment
 
-Edit `movie_engine_api_stack.py` to adjust:
+### Test Backend API
 
-- `memory_size`: Lambda memory (default: 3008 MB)
-- `timeout`: Function timeout (default: 60 seconds)
-- `reserved_concurrent_executions`: Concurrency limit (default: 10)
+```bash
+# Get API URL
+API_URL=$(aws cloudformation describe-stacks \
+    --stack-name MovieEngineAPIStack \
+    --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+    --output text)
 
-### API Gateway
+# Health check
+curl $API_URL/health
 
-The HTTP API includes:
-- CORS enabled for all origins
-- Lambda proxy integration
-- Automatic stage deployment
+# Get recommendations
+curl -X POST $API_URL/recommendations \
+    -H "Content-Type: application/json" \
+    -d '{"user_ratings": {"1": 5.0, "50": 4.5}, "n": 5}'
+```
 
-## Cost Optimization
+### Test Frontend
 
-- **Lambda**: Uses 3GB memory, charged per 100ms of execution
-- **API Gateway**: HTTP API is cheaper than REST API
-- **S3**: Standard storage for model files (~750MB)
-- **CloudWatch**: 1-week log retention
+```bash
+# Get website URL
+WEBSITE_URL=$(aws cloudformation describe-stacks \
+    --stack-name MovieEngineFrontendStack \
+    --query 'Stacks[0].Outputs[?OutputKey==`WebsiteUrl`].OutputValue' \
+    --output text)
 
-Consider:
-- **Provisioned Concurrency**: For consistent performance (adds cost)
-- **S3 Intelligent Tiering**: If model files are rarely accessed
-- **Lambda Reserved Concurrency**: Limits concurrent executions
+# Open in browser
+open $WEBSITE_URL
+```
 
 ## Monitoring
 
 ### CloudWatch Logs
 
 ```bash
-# Stream Lambda logs
+# Stream API Lambda logs
 aws logs tail /aws/lambda/movie-recommendation-api --follow
 
 # View API Gateway logs
@@ -176,79 +224,151 @@ aws logs tail "API-Gateway-Execution-Logs_<api-id>/<stage>" --follow
 
 ### CloudWatch Metrics
 
-Key metrics to monitor:
-- Lambda Duration
-- Lambda Errors
-- Lambda Invocations
-- API Gateway 4XX/5XX errors
-- API Gateway Latency
+Monitor key metrics:
+- **Lambda Duration**: Function execution time
+- **Lambda Errors**: Failed invocations
+- **API Gateway 4XX/5XX**: HTTP errors
+- **API Gateway Latency**: Request response times
 
-### Alarms (Optional)
-
-Add to `movie_engine_api_stack.py`:
-```python
-import aws_cdk.aws_cloudwatch as cloudwatch
-
-alarm = cloudwatch.Alarm(
-    self, "ErrorAlarm",
-    metric=api_function.metric_errors(),
-    threshold=10,
-    evaluation_periods=1,
-)
-```
-
-## Troubleshooting
-
-### Deployment fails with bucket already exists
-The bucket name `movie-engine-data` must be globally unique. Either:
-1. Delete the existing bucket
-2. Change the bucket name in `movie_engine_api_stack.py`
-
-### Lambda timeout errors
-Increase timeout in `movie_engine_api_stack.py`:
-```python
-timeout=Duration.seconds(120)
-```
-
-### Out of memory errors
-Increase Lambda memory:
-```python
-memory_size=4096  # 4GB
-```
-
-### Cold start performance
-First request after deployment takes 10-30 seconds. Options:
-1. Enable provisioned concurrency (adds cost)
-2. Use Lambda warming strategies
-3. Implement lazy loading
-
-### S3 access denied
-Verify:
-- Lambda execution role has S3 read permissions
-- Model files exist in bucket: `aws s3 ls s3://movie-engine-data/models/`
-
-## Cleanup
+## Common CDK Commands
 
 ```bash
-# Destroy the stack (keeps S3 bucket)
-cdk destroy
+# List all stacks
+cdk ls
 
-# Manually delete S3 bucket if needed
-aws s3 rm s3://movie-engine-data --recursive
-aws s3 rb s3://movie-engine-data
+# Show CloudFormation template
+cdk synth
+
+# Compare deployed vs current state
+cdk diff
+
+# Deploy specific stack
+cdk deploy MovieEngineAPIStack
+
+# Deploy all stacks
+cdk deploy --all
+
+# Destroy stack (keeps S3 data)
+cdk destroy MovieEngineAPIStack
 ```
+
+## Update Deployments
+
+### Update Backend
+
+```bash
+# Make changes to Lambda code or stack configuration
+# Then redeploy
+cdk deploy MovieEngineAPIStack
+```
+
+### Update Frontend
+
+```bash
+# Make changes to React code
+# Then rebuild and sync
+./deploy_frontend.sh
+```
+
+Or manually:
+```bash
+cd ../movie-engine-fe
+npm run build
+aws s3 sync dist/ s3://movie-engine-frontend/ --delete \
+    --cache-control "public, max-age=31536000, immutable" \
+    --exclude "index.html"
+aws s3 cp dist/index.html s3://movie-engine-frontend/index.html \
+    --cache-control "no-cache"
+```
+
+### Update Model Files
+
+```bash
+# Sync new models to S3
+aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models/
+
+# Lambda will automatically use new files on next invocation
+```
+
+## Cost Estimates
+
+Typical monthly costs (low traffic):
+- **Lambda**: ~$0.20 (100 requests/day)
+- **API Gateway**: ~$1.00 (100 requests/day)
+- **S3 Storage**: ~$0.02 (1GB models + frontend)
+- **S3 Requests**: ~$0.01
+- **CloudWatch Logs**: ~$0.50
+
+**Total: ~$2/month** for development/testing
+
+Production costs scale with usage. Some easy optimizations if this were taken further:
+- Lambda provisioned concurrency (~$35/month per instance)
+- CloudFront distribution (~$1/month + data transfer)
+- API Gateway caching (~$0.02/hour)
 
 ## Security
 
-- S3 bucket blocks all public access
-- Lambda has minimal IAM permissions (S3 read only)
-- API Gateway uses AWS WAF (optional - not included)
-- HTTPS only via API Gateway
+- **S3 Data Bucket**: Private, Lambda access only
+- **S3 Frontend Bucket**: Public read for website hosting
+- **Lambda**: Minimal IAM permissions (S3 read only)
+- **API Gateway**: HTTPS only, CORS enabled
 
-## Next Steps
+## Troubleshooting
 
-- Add custom domain name to API Gateway
-- Implement API authentication (Cognito, API keys)
-- Add CloudWatch alarms for monitoring
-- Set up CI/CD pipeline for automated deployments
-- Add AWS WAF for API protection
+### Lambda timeout errors
+Increase timeout in `movie_engine_api_stack.py` (default 60s)
+
+### Out of memory errors
+Increase Lambda memory in `movie_engine_api_stack.py` (default 3GB)
+
+### Frontend shows wrong API URL
+Rebuild and redeploy frontend:
+```bash
+./deploy_frontend.sh
+```
+
+### Model files not found
+Verify files exist in S3:
+```bash
+aws s3 ls s3://movie-engine-data/models/
+```
+
+### Stack deployment fails
+Check CloudFormation events:
+```bash
+aws cloudformation describe-stack-events --stack-name MovieEngineAPIStack
+```
+
+## Cleanup
+
+Remove all infrastructure:
+
+```bash
+# Destroy stacks
+cdk destroy --all
+
+# Manually delete S3 buckets (CDK retains by default)
+aws s3 rm s3://movie-engine-data --recursive
+aws s3 rb s3://movie-engine-data
+aws s3 rm s3://movie-engine-frontend --recursive
+aws s3 rb s3://movie-engine-frontend
+```
+
+## Production Considerations
+
+Were this to be a real app, the following would be done:
+
+1. **Custom Domain**: Configure Route 53 and ACM certificates
+2. **Enable CloudFront**: Use `movie_engine_frontend_stack.py` for CDN
+3. **Set up Monitoring**: Add CloudWatch alarms and dashboards
+4. **Implement CI/CD**: Automate deployments with GitHub Actions or CodePipeline
+5. **Enable WAF**: Protect API Gateway from common attacks
+6. **Configure Backup**: Enable S3 versioning for model files
+7. **Optimize Costs**: Review Lambda memory/timeout settings
+
+## Support
+
+For detailed deployment information:
+- Backend API: See [BACKEND_DEPLOYMENT.md](./BACKEND_DEPLOYMENT.md)
+- Frontend: See [FRONTEND_DEPLOYMENT.md](./FRONTEND_DEPLOYMENT.md)
+- CDK Issues: Check CloudFormation events and CDK documentation
