@@ -162,6 +162,24 @@
   gap: 0.25rem;
 }
 
+.rating-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.rating-disliked {
+  color: #e74c3c;
+}
+
+.rating-neutral {
+  color: #f39c12;
+}
+
+.rating-liked {
+  color: #2ecc71;
+}
+
 .rating-item-remove {
   width: 32px;
   height: 32px;
@@ -259,11 +277,23 @@
   }
 
   .rating-item-title {
-    font-size: 0.9rem;
+    font-size: 1.2rem;
   }
 
   .rating-item-meta {
-    font-size: 0.8rem;
+    font-size: 1.2rem;
+  }
+
+  .rating-liked {
+    color: #2ecc71;
+  }
+
+  .rating-neutral {
+    color: #f39c12;
+  }
+
+  .rating-disliked {
+    color: #e74c3c;
   }
 
   .drawer-footer {

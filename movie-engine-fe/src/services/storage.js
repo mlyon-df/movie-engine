@@ -65,3 +65,37 @@ export function getRatingCount() {
   const ratings = getRatings();
   return Object.keys(ratings).length;
 }
+
+
+/**
+ * Store movie title and year by movieId
+ * @param {number} movieId - The movie ID
+ * @param {string} title - The movie title
+ * @param {string} year - The movie year
+ */
+export function saveMovieInfo(movieId, title, year) {
+  try {
+    const movies = JSON.parse(localStorage.getItem('movie-engine-movies') || '{}');
+    // Normalize title before storing
+    movies[movieId] = { title, year };
+    localStorage.setItem('movie-engine-movies', JSON.stringify(movies));
+  } catch (error) {
+    console.error('Failed to save movie info to storage:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get movie title and year by movieId
+ * @param {number} movieId - The movie ID
+ * @returns {Object|null} Movie info object or null if not found
+ */
+export function getMovieInfo(movieId) {
+  try {
+    const movies = JSON.parse(localStorage.getItem('movie-engine-movies') || '{}');
+    return movies[movieId] || null;
+  } catch (error) {
+    console.error('Failed to get movie info from storage:', error);
+    return null;
+  }
+}

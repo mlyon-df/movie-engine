@@ -1,19 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './MovieCard.css';
 
 /**
- * Extract year from title in format "Movie Name (YYYY)"
+ * Placeholder component for missing posters
  */
-function extractYear(title) {
-  const match = title.match(/\((\d{4})\)$/);
-  return match ? match[1] : '';
-}
-
-/**
- * Remove year from title
- */
-function extractTitle(title) {
-  return title.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+function PosterPlaceholder({ title }) {
+  return (
+    <div className="poster-placeholder">
+      <svg viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="150" fill="#16213e"/>
+        <g opacity="0.3">
+          <rect x="20" y="30" width="60" height="40" rx="2" fill="none" stroke="#ffffff" strokeWidth="2"/>
+          <circle cx="35" cy="45" r="5" fill="#ffffff"/>
+          <polygon points="20,70 35,55 50,60 65,50 80,70" fill="#ffffff"/>
+        </g>
+        <text x="50" y="100" textAnchor="middle" fill="#ffffff" fontSize="8" opacity="0.5">
+          No Poster
+        </text>
+        <text x="50" y="110" textAnchor="middle" fill="#ffffff" fontSize="8" opacity="0.5">
+          Available
+        </text>
+      </svg>
+    </div>
+  );
 }
 
 /**
@@ -21,25 +30,32 @@ function extractTitle(title) {
  * Displays a movie with poster, title, year, and rating options
  */
 export default function MovieCard({ movie, onRate, onSkip }) {
-  const title = extractTitle(movie.title);
-  const year = extractYear(movie.title);
-  const posterUrl = movie.poster_url || 'https://via.placeholder.com/500x750/1a1a2e/ffffff?text=No+Poster';
+  const title = movie.title;
+  const year = movie.year;
+  const [imageError, setImageError] = useState(false);
+  const posterUrl = movie.poster_url;
 
   const handleRate = (rating) => {
     onRate(movie.movieId, rating);
   };
 
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
   return (
     <div className="movie-card">
       <div className="movie-poster-container">
-        <img 
-          src={posterUrl} 
-          alt={title}
-          className="movie-poster"
-          onError={(e) => {
-            e.target.src = 'https://via.placeholder.com/500x750/1a1a2e/ffffff?text=No+Poster';
-          }}
-        />
+        {!posterUrl || imageError ? (
+          <PosterPlaceholder title={title} />
+        ) : (
+          <img 
+            src={posterUrl} 
+            alt={title}
+            className="movie-poster"
+            onError={handleImageError}
+          />
+        )}
       </div>
 
       <div className="movie-info">

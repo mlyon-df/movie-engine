@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MovieCard from './components/MovieCard';
 import Drawer from './components/Drawer';
 import { getRecommendations } from './services/api';
-import { getRatings, saveRating, clearRatings, removeRating } from './services/storage';
+import { getRatings, saveRating, clearRatings, removeRating, saveMovieInfo } from './services/storage';
 import './App.css';
 
 function App() {
@@ -12,7 +12,6 @@ function App() {
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [moviesData, setMoviesData] = useState({});
 
   // Load initial recommendations
   useEffect(() => {
@@ -28,21 +27,18 @@ function App() {
       const response = await getRecommendations(userRatings, 10);
       
       if (response.recommendations && response.recommendations.length > 0) {
+        // Save movie info to local storage for drawer
+        response.recommendations.forEach(movie => {
+          movie.year = extractYear(movie.title);
+          movie.title = extractTitle(movie.title);
+          saveMovieInfo(movie.movieId, movie.title, movie.year);
+          response.recommendations[movie.movieId] = movie;
+        });
+        
         // Randomize the order
         const shuffled = [...response.recommendations].sort(() => Math.random() - 0.5);
         setRecommendations(shuffled);
         setCurrentIndex(0);
-        
-        // Store movie data for the drawer
-        const newMoviesData = { ...moviesData };
-        response.recommendations.forEach(movie => {
-          newMoviesData[movie.movieId] = {
-            title: movie.title,
-            poster_url: movie.poster_url,
-            overview: movie.overview
-          };
-        });
-        setMoviesData(newMoviesData);
       } else {
         setError('No recommendations available. Please try again.');
       }
@@ -65,16 +61,13 @@ function App() {
       const response = await getRecommendations(userRatings, 10);
       
       if (response.recommendations && response.recommendations.length > 0) {
-        // Store movie data
-        const newMoviesData = { ...moviesData };
+        // Save movie info to local storage for drawer
         response.recommendations.forEach(movie => {
-          newMoviesData[movie.movieId] = {
-            title: movie.title,
-            poster_url: movie.poster_url,
-            overview: movie.overview
-          };
+          movie.year = extractYear(movie.title);
+          movie.title = extractTitle(movie.title);
+          saveMovieInfo(movie.movieId, movie.title, movie.year);
+          response.recommendations[movie.movieId] = movie;
         });
-        setMoviesData(newMoviesData);
         
         // Filter out already rated movies
         const ratedMovieIds = Object.keys(userRatings).map(Number);
@@ -127,6 +120,32 @@ function App() {
   };
 
   const currentMovie = recommendations[currentIndex];
+  
+  // Helper function to extract year from title
+  const extractYear = (title) => {
+    const match = title.match(/\((\d{4})\)$/);
+    return match ? match[1] : '';
+  };
+
+  // Helper function to extract title without year
+  const extractTitle = (title) => {
+    return normalizeTitle(title.replace(/\s*\(\d{4}\)\s*$/, '').trim());
+  };
+
+  // Helper function to normalize title
+  function normalizeTitle(title) {
+    if (!title) return title;
+    
+    // Match pattern: "Title, Article" where Article is A, An, or The
+    const match = title.match(/^(.+),\s*(A|An|The)$/i);
+    if (match) {
+      const mainTitle = match[1].trim();
+      const article = match[2];
+      return `${article} ${mainTitle}`;
+    }
+    
+    return title;
+  }
 
   return (
     <div className="app">
@@ -145,7 +164,6 @@ function App() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         ratings={getRatings()}
-        moviesData={moviesData}
         onRemoveRating={handleRemoveRating}
         onClearAll={handleClearRatings}
       />
