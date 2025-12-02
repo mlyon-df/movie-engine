@@ -44,6 +44,59 @@ echo ""
 # Deploy to S3
 echo "Deploying to S3..."
 BUCKET_NAME="movie-engine-frontend"
+REGION="us-west-2"
+
+# Check if bucket exists, create if it doesn't
+echo "Checking if S3 bucket exists..."
+BUCKET_EXISTS=false
+if aws s3 ls "s3://${BUCKET_NAME}" --region ${REGION} 2>&1 > /dev/null; then
+    BUCKET_EXISTS=true
+    echo "Bucket already exists."
+else
+    echo "Bucket does not exist. Creating ${BUCKET_NAME}..."
+    aws s3 mb s3://${BUCKET_NAME} --region ${REGION}
+    echo "Bucket created!"
+fi
+echo ""
+
+# Always configure bucket settings (in case bucket exists but isn't configured)
+echo "Configuring bucket settings..."
+
+# Disable Block Public Access for this specific bucket
+echo "  - Disabling Block Public Access..."
+aws s3api put-public-access-block \
+    --bucket ${BUCKET_NAME} \
+    --region ${REGION} \
+    --public-access-block-configuration \
+        "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+
+# Small delay to allow settings to propagate
+sleep 2
+
+# Enable static website hosting
+echo "  - Enabling static website hosting..."
+aws s3 website s3://${BUCKET_NAME}/ \
+    --index-document index.html \
+    --error-document index.html
+
+# Set bucket policy for public read access
+echo "  - Setting public read policy..."
+aws s3api put-bucket-policy \
+    --bucket ${BUCKET_NAME} \
+    --region ${REGION} \
+    --policy "{
+        \"Version\": \"2012-10-17\",
+        \"Statement\": [{
+            \"Sid\": \"PublicReadGetObject\",
+            \"Effect\": \"Allow\",
+            \"Principal\": \"*\",
+            \"Action\": \"s3:GetObject\",
+            \"Resource\": \"arn:aws:s3:::${BUCKET_NAME}/*\"
+        }]
+    }"
+
+echo "Bucket configuration complete!"
+echo ""
 
 # Sync files to S3
 aws s3 sync dist/ s3://${BUCKET_NAME}/ \
@@ -58,6 +111,6 @@ aws s3 cp dist/index.html s3://${BUCKET_NAME}/index.html \
 echo ""
 echo "Deployment complete!"
 echo ""
-echo "Frontend URL: http://${BUCKET_NAME}.s3-website-us-east-1.amazonaws.com"
+echo "Frontend URL: http://${BUCKET_NAME}.s3-website-${REGION}.amazonaws.com"
 echo "API URL: $API_URL"
 echo ""

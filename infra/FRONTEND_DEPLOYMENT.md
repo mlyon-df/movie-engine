@@ -136,9 +136,9 @@ aws s3 sync dist/ s3://movie-engine-frontend/ --delete
 ## Access the Website
 
 After deployment, access your website at:
-- **S3 Website URL**: `http://movie-engine-frontend.s3-website-us-east-1.amazonaws.com`
+- **S3 Website URL**: `http://movie-engine-frontend.s3-website-us-west-2.amazonaws.com`
 
-(Replace `us-east-1` with your region if different)
+(Replace `us-west-2` with your region if different)
 
 ## Configure API URL
 

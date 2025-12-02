@@ -27,7 +27,7 @@ pip install -r requirements.txt
 - **Lambda Function** (`movie-recommendation-api`): FastAPI application
   - 3GB memory (for large similarity matrix)
   - 60 second timeout (for S3 cold starts)
-  - Python 3.11 runtime
+  - Python 3.13 runtime
 - **HTTP API Gateway**: Public API endpoint
 - **IAM Roles**: Lambda execution role with S3 read permissions
 - **CloudWatch Logs**: API logs with 1-week retention
@@ -63,6 +63,9 @@ aws s3 cp ../movie-engine-data/processed/ml-100k/movies.csv \
 
 aws s3 cp ../movie-engine-data/processed/ml-100k/ratings.csv \
   s3://movie-engine-data/processed/ml-100k/ratings.csv
+
+aws s3 cp ../movie-engine-data/processed/ml-100k/links.csv \
+  s3://movie-engine-data/processed/ml-100k/links.csv
 ```
 
 Or use the sync command:

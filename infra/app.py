@@ -17,7 +17,7 @@ MovieEngineAPIStack(
     description="Movie Recommendation API with Lambda, API Gateway, and S3",
     env=cdk.Environment(
         account=app.node.try_get_context("account"),
-        region=app.node.try_get_context("region") or "us-east-1"
+        region=app.node.try_get_context("region") or "us-west-2"
     )
 )
 
@@ -28,7 +28,7 @@ MovieEngineFrontendStack(
     description="Movie Recommendation Frontend with S3 static website hosting",
     env=cdk.Environment(
         account=app.node.try_get_context("account"),
-        region=app.node.try_get_context("region") or "us-east-1"
+        region=app.node.try_get_context("region") or "us-west-2"
     )
 )
 
