@@ -29,7 +29,7 @@ class MovieEngineAPIStack(Stack):
     - Lambda function for API
     - HTTP API Gateway
     - IAM roles and permissions
-    - Optional scheduled warming to reduce cold starts
+    - Optional scheduled warming or provisioned concurrency to reduce cold starts
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -40,8 +40,12 @@ class MovieEngineAPIStack(Stack):
         if not tmdb_api_key:
             print("WARNING: TMDB_API_KEY not set. Movie metadata features will not work.")
 
-        # Get warming configuration (default: enabled)
-        enable_warming = os.environ.get("ENABLE_WARMING", "true").lower() == "true"
+        # Get provisioned concurrency configuration
+        enable_provisioned = os.environ.get("ENABLE_PROVISIONED_CONCURRENCY", "false").lower() == "true"
+        provisioned_instances = int(os.environ.get("PROVISIONED_CONCURRENCY_COUNT", "1"))
+
+        # Get warming configuration (default: enabled if provisioned concurrency is disabled)
+        enable_warming = os.environ.get("ENABLE_WARMING", "true" if not enable_provisioned else "false").lower() == "true"
         warming_rate_minutes = int(os.environ.get("WARMING_RATE_MINUTES", "5"))
 
         # ========================================
@@ -144,9 +148,35 @@ class MovieEngineAPIStack(Stack):
         model_bucket.grant_read(api_function)
 
         # ========================================
+        # Provisioned Concurrency (Optional)
+        # ========================================
+        if enable_provisioned:
+            print(f"Enabling provisioned concurrency with {provisioned_instances} instance(s)")
+            print(f"Note: This will incur additional costs (~${10 * provisioned_instances}-${20 * provisioned_instances}/month)")
+            
+            # Create a version for the function
+            version = api_function.current_version
+            
+            # Create an alias pointing to the version with provisioned concurrency
+            alias = lambda_.Alias(
+                self,
+                "ApiLiveAlias",
+                alias_name="live",
+                version=version,
+                provisioned_concurrent_executions=provisioned_instances,
+            )
+            
+            # Use the alias for API Gateway integration
+            lambda_integration_target = alias
+            print("Provisioned concurrency enabled. Lambda will stay warm.")
+        else:
+            print("Provisioned concurrency disabled. Set ENABLE_PROVISIONED_CONCURRENCY=true to enable.")
+            lambda_integration_target = api_function
+
+        # ========================================
         # Scheduled Warming (Optional)
         # ========================================
-        if enable_warming:
+        if enable_warming and not enable_provisioned:
             print(f"Enabling scheduled warming every {warming_rate_minutes} minutes")
             print("Note: This keeps 1 container warm but doesn't guarantee no cold starts")
             
@@ -161,13 +191,15 @@ class MovieEngineAPIStack(Stack):
             # Add Lambda as target
             warming_rule.add_target(
                 targets.LambdaFunction(
-                    api_function,
+                    lambda_integration_target,
                     event=events.RuleTargetInput.from_object({
                         "warmer": True,
                         "path": "/health"
                     })
                 )
             )
+        elif enable_provisioned:
+            print("Scheduled warming disabled (provisioned concurrency is enabled).")
         else:
             print("Scheduled warming disabled. Set ENABLE_WARMING=true to enable.")
 
@@ -192,10 +224,10 @@ class MovieEngineAPIStack(Stack):
             },
         )
 
-        # Lambda integration
+        # Lambda integration (uses alias if provisioned concurrency is enabled)
         lambda_integration = integrations.HttpLambdaIntegration(
             "LambdaIntegration",
-            api_function,
+            lambda_integration_target,
         )
 
         # Add routes
@@ -240,6 +272,20 @@ class MovieEngineAPIStack(Stack):
             description="Lambda function ARN",
             export_name="MovieEngineFunctionArn",
         )
+        
+        if enable_provisioned:
+            CfnOutput(
+                self,
+                "AliasName",
+                value=alias.alias_name,
+                description="Lambda alias with provisioned concurrency",
+            )
+            CfnOutput(
+                self,
+                "ProvisionedInstances",
+                value=str(provisioned_instances),
+                description="Number of provisioned concurrent instances",
+            )
         
         if enable_warming:
             CfnOutput(
