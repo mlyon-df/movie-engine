@@ -43,6 +43,7 @@ def test_recommendations_no_ratings():
         print("\nRecommendations:")
         for rec in result['recommendations']:
             print(f"  {rec['title']} (Rating: {rec['predicted_rating']:.2f})")
+            print(f"    Genres: {', '.join(rec['genres']) if rec['genres'] else 'N/A'}")
     else:
         print(f"Error: {response.text}")
     print()

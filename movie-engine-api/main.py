@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from mangum import Mangum
 import logging
+import pandas as pd
 
 from model_loader import ModelLoader
 from recommender import RecommendationEngine
@@ -84,6 +85,10 @@ class MovieRecommendation(BaseModel):
     movieId: int
     title: str
     predicted_rating: float
+    genres: Optional[List[str]] = Field(
+        default=None,
+        description="List of movie genres"
+    )
     poster_url: Optional[str] = Field(
         default=None,
         description="URL to movie poster from TMDB"
@@ -174,6 +179,7 @@ async def get_recommendations(request: RecommendationRequest):
                 movieId=int(row['movieId']),
                 title=row['title'],
                 predicted_rating=float(row['predicted_rating']),
+                genres=row.get('genres') if isinstance(row.get('genres'), list) else None,
                 poster_url=row.get('poster_url'),
                 overview=row.get('overview')
             )

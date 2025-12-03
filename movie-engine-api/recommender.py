@@ -29,9 +29,27 @@ class RecommendationEngine:
         - tmdb_api_key: TMDB API key (optional, can be set via env var)
         """
         self.item_similarity_df = item_similarity_df
-        self.movies_df = movies_df
         self.ratings_df = ratings_df
         self.links_df = links_df
+        
+        # Identify genre columns (one-hot encoded)
+        # Genre columns are those that are not movieId or title
+        self.genre_columns = [col for col in movies_df.columns 
+                             if col not in ['movieId', 'title'] and movies_df[col].dtype in ['int64', 'int32', 'float64']]
+        
+        # Create a genres list column from one-hot encoded columns (cached in memory)
+        if self.genre_columns:
+            logger.info(f"Found {len(self.genre_columns)} genre columns. Building genres cache...")
+            # Pre-compute genres as a list for each movie - this is done once and cached
+            movies_df = movies_df.copy()
+            movies_df['genres'] = movies_df[self.genre_columns].apply(
+                lambda row: [self.genre_columns[i] for i, val in enumerate(row) if val == 1],
+                axis=1
+            )
+            logger.info("Genres cache built successfully")
+        
+        # Store the movies_df with genres column
+        self.movies_df = movies_df
         
         # Initialize TMDB client if links are provided
         self.tmdb_client = None
@@ -94,7 +112,12 @@ class RecommendationEngine:
         popular = popular[popular['rating_count'] >= 50]
         popular = popular.sort_values('avg_rating', ascending=False).head(n)
         
-        result = self.movies_df[self.movies_df['movieId'].isin(popular['movieId'])][['movieId', 'title']].merge(
+        # Include genres if available
+        movie_cols = ['movieId', 'title']
+        if 'genres' in self.movies_df.columns:
+            movie_cols.append('genres')
+        
+        result = self.movies_df[self.movies_df['movieId'].isin(popular['movieId'])][movie_cols].merge(
             popular[['movieId', 'avg_rating']], on='movieId'
         ).rename(columns={'avg_rating': 'predicted_rating'})
         
@@ -152,7 +175,12 @@ class RecommendationEngine:
             
             # Get top personalized recommendations
             personalized = predictions_df.sort_values('predicted_rating', ascending=False).head(n * 2)
-            personalized = self.movies_df[['movieId', 'title']].merge(personalized, on='movieId')
+            # Include genres if available
+            movie_cols = ['movieId', 'title']
+            if 'genres' in self.movies_df.columns:
+                movie_cols.append('genres')
+            
+            personalized = self.movies_df[movie_cols].merge(personalized, on='movieId')
             
             # Get popular recommendations
             popular = self.get_popular_movies(n * 2)
@@ -168,7 +196,13 @@ class RecommendationEngine:
         # Case 3: Sufficient ratings (5+) - fully personalized
         logger.info(f"{num_ratings} ratings provided. Generating fully personalized recommendations.")
         predictions_df = predictions_df.sort_values('predicted_rating', ascending=False).head(n)
-        recommendations = self.movies_df[['movieId', 'title']].merge(predictions_df, on='movieId')
+        
+        # Include genres if available
+        movie_cols = ['movieId', 'title']
+        if 'genres' in self.movies_df.columns:
+            movie_cols.append('genres')
+        
+        recommendations = self.movies_df[movie_cols].merge(predictions_df, on='movieId')
         
         # Enrich with TMDB data
         recommendations = self._enrich_with_tmdb(recommendations)
