@@ -50,6 +50,7 @@ This directory contains AWS CDK stacks and deployment scripts for a complete mov
 - **Python 3.8+** for CDK
 - **Node.js 18+** for frontend build
 - **AWS Account** with appropriate permissions
+- **TMDB API Key** (optional but recommended) - Get one free at [themoviedb.org](https://www.themoviedb.org/settings/api)
 
 ## Quick Start - Full Deployment
 
@@ -63,14 +64,17 @@ pip install -r requirements.txt
 # 2. Bootstrap CDK (first time only)
 cdk bootstrap
 
-# 3. Deploy backend API
+# 3. Set TMDB API key (optional but recommended for movie posters/overviews)
+export TMDB_API_KEY="your_api_key_here"
+
+# 4. Deploy backend API
 cdk deploy MovieEngineAPIStack
 
-# 4. Upload model files to S3
+# 5. Upload model files to S3
 aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models/
 aws s3 sync ../movie-engine-data/processed s3://movie-engine-data/processed/
 
-# 5. Deploy frontend (automatically configures API URL)
+# 6. Deploy frontend (automatically configures API URL)
 ./deploy_frontend.sh
 ```
 
@@ -142,6 +146,39 @@ cdk deploy --all
 Note: You'll still need to upload model files and build the frontend separately.
 
 ## Configuration Management
+
+### TMDB API Key
+
+The backend uses The Movie Database (TMDB) API to fetch movie posters and plot overviews. While optional, it's highly recommended for the best user experience.
+
+**Get a free API key:**
+1. Sign up at [themoviedb.org](https://www.themoviedb.org/)
+2. Go to Settings → API → Request API Key (Developer)
+3. Copy your API key (v3 auth)
+
+**Configure for deployment:**
+
+```bash
+# Set as environment variable before deploying
+export TMDB_API_KEY="your_api_key_here"
+cdk deploy MovieEngineAPIStack
+```
+
+**Update existing Lambda function:**
+
+```bash
+# Add to existing Lambda
+aws lambda update-function-configuration \
+    --function-name movie-recommendation-api \
+    --environment "Variables={TMDB_API_KEY=your_api_key_here}"
+```
+
+Or via AWS Console:
+1. Open Lambda → movie-recommendation-api
+2. Configuration → Environment variables
+3. Add: `TMDB_API_KEY` = `your_api_key_here`
+
+**Without TMDB API key:** The app still works but shows placeholder images instead of movie posters and no plot descriptions.
 
 ### API URL Configuration
 
@@ -314,6 +351,9 @@ Production costs scale with usage. Some easy optimizations if this were taken fu
 - **API Gateway**: HTTPS only, CORS enabled
 
 ## Troubleshooting
+
+### Missing movie posters or descriptions
+Set the TMDB_API_KEY environment variable (see Configuration Management section above)
 
 ### Lambda timeout errors
 Increase timeout in `movie_engine_api_stack.py` (default 60s)
