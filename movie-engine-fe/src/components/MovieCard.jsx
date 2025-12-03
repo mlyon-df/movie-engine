@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import MovieModal from './MovieModal';
 import './MovieCard.css';
 
 /**
@@ -33,6 +34,7 @@ export default function MovieCard({ movie, onRate, onSkip }) {
   const title = movie.title;
   const year = movie.year;
   const [imageError, setImageError] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const posterUrl = movie.poster_url;
 
   const handleRate = (rating) => {
@@ -43,9 +45,13 @@ export default function MovieCard({ movie, onRate, onSkip }) {
     setImageError(true);
   };
 
+  const handlePosterClick = () => {
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="movie-card">
-      <div className="movie-poster-container">
+      <div className="movie-poster-container" onClick={handlePosterClick} style={{ cursor: 'pointer' }}>
         {!posterUrl || imageError ? (
           <PosterPlaceholder title={title} />
         ) : (
@@ -57,6 +63,12 @@ export default function MovieCard({ movie, onRate, onSkip }) {
           />
         )}
       </div>
+
+      <MovieModal 
+        movie={movie} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
 
       <div className="movie-info">
         <h2 className="movie-title">{title}</h2>

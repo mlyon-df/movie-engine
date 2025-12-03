@@ -1,15 +1,17 @@
-# Movie Recommender Frontend
+# Movie Engine Frontend
 
-A mobile-first React application for getting personalized movie recommendations.
+A mobile-first React web application for discovering and rating movies through an intuitive swipe-style interface. The app provides personalized movie recommendations powered by the Movie Engine API.
 
 ## Features
 
-- 🎬 Personalized movie recommendations using Item-Based Collaborative Filtering
-- 📱 Mobile-first, responsive design optimized for portrait mode
-- 💾 Local storage to persist user ratings
-- 🎨 Clean, modern UI with movie posters from TMDB
-- ⚡ Fast and smooth user experience
-- 🔄 Real-time recommendation updates based on ratings
+- 🎬 **Personalized Recommendations**: Get movie suggestions based on your rating history using Item-Based Collaborative Filtering
+- 📱 **Mobile-First Design**: Optimized for portrait mode on phones with responsive scaling
+- 🎯 **Swipe-Style Interface**: Rate movies with simple tap interactions (dislike, neutral, like)
+- 🎭 **Movie Details Modal**: Tap posters to view genres and overview information
+- 📊 **Rating History Drawer**: View and manage all your rated movies
+- 💾 **Offline Storage**: All ratings and movie data persisted in browser localStorage
+- 🎨 **TMDB Integration**: Movie posters and descriptions from The Movie Database
+- ⚡ **Fast & Smooth**: Clean, modern UI with smooth animations
 
 ## Rating System
 
@@ -21,8 +23,8 @@ A mobile-first React application for getting personalized movie recommendations.
 
 ### Prerequisites
 
-- Node.js 16+ installed
-- Movie Engine API running (default: http://localhost:8000)
+- Node.js 16+ and npm
+- Movie Engine API running (backend)
 
 ### Installation
 
@@ -31,13 +33,14 @@ A mobile-first React application for getting personalized movie recommendations.
 npm install
 ```
 
-2. (Optional) Configure API URL:
-Create a `.env` file in the root directory:
-```
+2. Configure the API URL:
+
+Create a `.env` file in the project root:
+```bash
 VITE_API_URL=http://localhost:8000
 ```
 
-If not specified, it defaults to `http://localhost:8000`.
+For production deployment, the API URL is automatically injected by the deployment script.
 
 ### Running the App
 
@@ -46,7 +49,7 @@ Development mode with hot reload:
 npm run dev
 ```
 
-The app will open at http://localhost:3000
+The app will be available at `http://localhost:5173`
 
 Build for production:
 ```bash
@@ -61,11 +64,13 @@ npm run preview
 ## How It Works
 
 1. **Initial Load**: The app fetches 10 movie recommendations from the API
-2. **Rating**: User rates a movie by clicking one of the three face buttons
-3. **Storage**: Rating is saved to browser's local storage
-4. **Refresh**: New recommendations are fetched based on updated ratings
-5. **Skip**: User can skip to the next movie in the current recommendation list
-6. **Continuous Flow**: When all movies are rated or skipped, new recommendations are loaded
+2. **View Details**: Tap any movie poster to see title, year, genres, and plot overview
+3. **Rating**: Rate a movie by tapping one of the three face buttons
+4. **Storage**: Rating and movie metadata are saved to browser's localStorage
+5. **Refresh**: New recommendations are fetched based on updated ratings
+6. **Skip**: Skip to the next movie in the current recommendation list without rating
+7. **Manage Ratings**: Open the drawer (menu button) to view/remove past ratings
+8. **Continuous Flow**: When all movies are rated or skipped, new recommendations are loaded
 
 ## Project Structure
 
@@ -73,17 +78,22 @@ npm run preview
 movie-engine-fe/
 ├── src/
 │   ├── components/
-│   │   ├── MovieCard.jsx       # Main movie display component
-│   │   └── MovieCard.css       # Movie card styles
+│   │   ├── Drawer.jsx          # Rating history sidebar
+│   │   ├── Drawer.css
+│   │   ├── MovieCard.jsx       # Main movie display card
+│   │   ├── MovieCard.css
+│   │   ├── MovieModal.jsx      # Movie details popup
+│   │   └── MovieModal.css
 │   ├── services/
-│   │   ├── api.js              # API communication
-│   │   └── storage.js          # Local storage management
-│   ├── App.jsx                 # Main app component
+│   │   ├── api.js              # API client for recommendations
+│   │   └── storage.js          # localStorage wrapper
+│   ├── App.jsx                 # Main application component
 │   ├── App.css                 # App-level styles
 │   ├── main.jsx                # React entry point
 │   └── index.css               # Global styles
+├── public/                     # Static assets
 ├── index.html                  # HTML template
-├── vite.config.js              # Vite configuration
+├── vite.config.js             # Vite configuration
 └── package.json                # Dependencies and scripts
 ```
 
@@ -91,9 +101,9 @@ movie-engine-fe/
 
 The frontend expects the following API endpoint:
 
-### POST `/recommendations`
+### POST `/recommend`
 
-Request body:
+**Request**:
 ```json
 {
   "user_ratings": {
@@ -101,32 +111,32 @@ Request body:
     "50": 3.0,
     "100": 1.0
   },
-  "n": 10,
-  "k": 10
+  "num_recommendations": 10
 }
 ```
 
-Response:
+**Response**:
 ```json
 {
   "recommendations": [
     {
-      "movieId": 1,
-      "title": "Movie Title (2001)",
-      "predicted_rating": 4.5,
-      "poster_url": "https://...",
-      "overview": "Movie description..."
+      "movieId": 123,
+      "title": "Movie Title (2024)",
+      "score": 4.5,
+      "poster_url": "https://image.tmdb.org/...",
+      "overview": "Plot description from TMDB...",
+      "genres": ["Action", "Adventure", "Sci-Fi"]
     }
-  ],
-  "total": 10,
-  "strategy": "personalized"
+  ]
 }
 ```
 
 ## Local Storage
 
-User ratings are stored in browser's local storage under the key `movie-engine-ratings`:
+The app stores data in browser localStorage:
 
+### Ratings
+Key: `movie-engine-ratings`
 ```json
 {
   "1": 5.0,
@@ -135,13 +145,42 @@ User ratings are stored in browser's local storage under the key `movie-engine-r
 }
 ```
 
+### Movie Metadata
+Key: `movie-engine-movies`
+```json
+{
+  "1": {
+    "title": "The Matrix",
+    "year": "1999",
+    "genres": ["Action", "Sci-Fi"],
+    "overview": "A computer hacker learns..."
+  }
+}
+```
+
+## Deployment
+
+The frontend can be deployed to AWS S3 as a static website:
+
+```bash
+# From the infra/ directory
+./deploy_frontend.sh
+```
+
+This script:
+1. Fetches the API Gateway URL from CloudFormation exports
+2. Injects it into the build via `VITE_API_URL` environment variable
+3. Builds the production bundle with `npm run build`
+4. Syncs the `dist/` folder to S3 bucket `movie-engine-frontend`
+5. Configures static website hosting and public read permissions
+
 ## Technologies Used
 
-- **React 18** - UI framework
-- **Vite** - Build tool and dev server
-- **CSS3** - Styling with modern features
-- **Local Storage API** - Client-side data persistence
-- **Fetch API** - HTTP requests
+- **React 18.3.1** - UI framework
+- **Vite 7.2.2** - Build tool and dev server
+- **CSS3** - Styling with modern features and animations
+- **localStorage API** - Client-side data persistence
+- **Fetch API** - HTTP requests to backend
 
 ## Browser Support
 
@@ -149,7 +188,8 @@ User ratings are stored in browser's local storage under the key `movie-engine-r
 - Firefox 88+
 - Safari 14+
 - Mobile browsers (iOS Safari, Chrome Mobile)
+- Requires JavaScript and localStorage enabled
 
 ## License
 
-Part of the Movie Engine project.
+See the LICENSE file in the root of the repository.

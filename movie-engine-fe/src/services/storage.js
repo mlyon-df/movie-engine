@@ -68,16 +68,22 @@ export function getRatingCount() {
 
 
 /**
- * Store movie title and year by movieId
+ * Store movie information by movieId
  * @param {number} movieId - The movie ID
  * @param {string} title - The movie title
  * @param {string} year - The movie year
+ * @param {Array} genres - The movie genres (optional)
+ * @param {string} overview - The movie overview (optional)
  */
-export function saveMovieInfo(movieId, title, year) {
+export function saveMovieInfo(movieId, title, year, genres = null, overview = null) {
   try {
     const movies = JSON.parse(localStorage.getItem('movie-engine-movies') || '{}');
-    // Normalize title before storing
-    movies[movieId] = { title, year };
+    movies[movieId] = { 
+      title, 
+      year,
+      ...(genres && { genres }),
+      ...(overview && { overview })
+    };
     localStorage.setItem('movie-engine-movies', JSON.stringify(movies));
   } catch (error) {
     console.error('Failed to save movie info to storage:', error);

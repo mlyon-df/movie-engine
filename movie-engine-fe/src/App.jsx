@@ -31,7 +31,7 @@ function App() {
         response.recommendations.forEach(movie => {
           movie.year = extractYear(movie.title);
           movie.title = extractTitle(movie.title);
-          saveMovieInfo(movie.movieId, movie.title, movie.year);
+          saveMovieInfo(movie.movieId, movie.title, movie.year, movie.genres, movie.overview);
           response.recommendations[movie.movieId] = movie;
         });
         
@@ -65,7 +65,7 @@ function App() {
         response.recommendations.forEach(movie => {
           movie.year = extractYear(movie.title);
           movie.title = extractTitle(movie.title);
-          saveMovieInfo(movie.movieId, movie.title, movie.year);
+          saveMovieInfo(movie.movieId, movie.title, movie.year, movie.genres, movie.overview);
           response.recommendations[movie.movieId] = movie;
         });
         
