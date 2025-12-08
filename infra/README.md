@@ -37,7 +37,8 @@ This directory contains AWS CDK stacks and deployment scripts for a complete mov
 - **`movie_engine_api_stack.py`**: Backend API infrastructure (Lambda, API Gateway, S3)
 - **`movie_engine_frontend_stack_simple.py`**: Frontend infrastructure (S3 website hosting)
 - **`movie_engine_frontend_stack.py`**: Alternative frontend with CloudFront (optional)
-- **`deploy_frontend.sh`**: Automated frontend deployment script
+- **`deploy_all.sh`**: **Complete deployment script (backend + frontend + model upload)**
+- **`deploy_frontend.sh`**: Frontend-only deployment script
 - **`generate_config.sh`**: Generate runtime configuration file
 - **`show_config.sh`**: Display current configuration
 - **`requirements.txt`**: CDK Python dependencies
@@ -49,12 +50,37 @@ This directory contains AWS CDK stacks and deployment scripts for a complete mov
 - **AWS CDK** v2 installed (`npm install -g aws-cdk`)
 - **Python 3.8+** for CDK
 - **Node.js 18+** for frontend build
+- **Docker** Desktop or Engine installed and running (required for Lambda layer bundling)
 - **AWS Account** with appropriate permissions
 - **TMDB API Key** (optional but recommended) - Get one free at [themoviedb.org](https://www.themoviedb.org/settings/api)
 
 ## Quick Start - Full Deployment
 
-Deploy both backend and frontend in one go:
+**Easiest Method:** Use the automated deployment script that handles everything:
+
+```bash
+# 1. Install CDK dependencies
+cd infra
+pip install -r requirements.txt
+
+# 2. Bootstrap CDK (first time only)
+cdk bootstrap
+
+# 3. Set TMDB API key (optional - script will prompt if not set)
+export TMDB_API_KEY="your_api_key_here"
+
+# 4. Run complete deployment
+./deploy_all.sh
+```
+
+The script will:
+- ✅ Deploy backend API (Lambda, API Gateway, S3)
+- ✅ Upload model files to S3 (if not already present)
+- ✅ Deploy frontend infrastructure (S3 bucket)
+- ✅ Build and upload React app
+- ✅ Display URLs for both frontend and API
+
+**Manual Method:** Step-by-step deployment:
 
 ```bash
 # 1. Install CDK dependencies
@@ -74,7 +100,10 @@ cdk deploy MovieEngineAPIStack
 aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models/
 aws s3 sync ../movie-engine-data/processed s3://movie-engine-data/processed/
 
-# 6. Deploy frontend (automatically configures API URL)
+# 6. Deploy frontend infrastructure
+cdk deploy MovieEngineFrontendStack
+
+# 7. Build and upload frontend
 ./deploy_frontend.sh
 ```
 
@@ -106,44 +135,51 @@ See **[FRONTEND_DEPLOYMENT.md](./FRONTEND_DEPLOYMENT.md)**
 
 ## Deployment Options
 
-### Option 1: Automated Deployment (Recommended)
+### Option 1: Complete Automated Deployment (Recommended)
 
-Use the provided script for seamless deployment:
+Use the all-in-one script for seamless full-stack deployment:
 
 ```bash
-# Deploy backend first
-cdk deploy MovieEngineAPIStack
+./deploy_all.sh
+```
 
-# Deploy frontend with automatic API URL configuration
+This handles backend, frontend, and model file uploads automatically.
+
+### Option 2: Component-by-Component Deployment
+
+Deploy individual components with more control:
+
+```bash
+# Deploy both CDK stacks
+cdk deploy --all
+
+# Upload model files
+aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models/
+aws s3 sync ../movie-engine-data/processed s3://movie-engine-data/processed/
+
+# Build and upload frontend
 ./deploy_frontend.sh
 ```
 
-### Option 2: Independent Stack Deployment
+### Option 3: Independent Stack Deployment
 
-Deploy stacks independently for more control:
+Deploy stacks independently for maximum control:
 
 ```bash
 # Backend only
 cdk deploy MovieEngineAPIStack
 
-# Frontend only
+# Frontend infrastructure only
 cdk deploy MovieEngineFrontendStack
 
-# Then manually build and sync frontend
+# Upload model files
+aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models/
+
+# Build and sync frontend manually
 cd ../movie-engine-fe
 npm run build
 aws s3 sync dist/ s3://movie-engine-frontend/ --delete
 ```
-
-### Option 3: Deploy All Stacks Together
-
-Deploy everything at once:
-
-```bash
-cdk deploy --all
-```
-
-Note: You'll still need to upload model files and build the frontend separately.
 
 ## Configuration Management
 
@@ -203,6 +239,43 @@ npm run build
 ```
 
 ### Environment Variables
+
+#### Lambda Cold Start Optimization
+
+The Lambda function loads ~100MB of model data from S3 on cold starts (10-30 seconds). Two solutions are available:
+
+**Option 1: Scheduled Warming (Default, Free-Tier Friendly)**
+
+Automatically enabled unless provisioned concurrency is set. EventBridge pings Lambda every 5 minutes to keep a container warm.
+
+```bash
+export ENABLE_WARMING=true              # Enable scheduled warming
+export WARMING_RATE_MINUTES=5           # Ping interval (default: 5 minutes)
+
+cdk deploy MovieEngineAPIStack
+```
+
+- **Cost**: ~$0.50/month (stays in free tier)
+- **Trade-off**: Reduces but doesn't eliminate cold starts (first request after 15+ min idle may still be slow)
+
+**Option 2: Provisioned Concurrency (Guaranteed Performance)**
+
+Keeps specified number of Lambda instances always warm and ready.
+
+```bash
+export ENABLE_PROVISIONED_CONCURRENCY=true
+export PROVISIONED_CONCURRENCY_COUNT=1   # Number of warm instances (default: 1)
+
+cdk deploy MovieEngineAPIStack
+```
+
+- **Cost**: ~$35-40/month per instance
+- **Trade-off**: Zero cold starts, but costs more
+- **Requirement**: AWS account must have Lambda concurrent execution limit > 10 (request increase if needed)
+
+**Note**: Provisioned concurrency automatically disables scheduled warming. You only need one or the other.
+
+#### Other Configuration
 
 Check current configuration:
 ```bash
@@ -352,14 +425,75 @@ Production costs scale with usage. Some easy optimizations if this were taken fu
 
 ## Troubleshooting
 
+### Docker not running
+
+**Error**: `Cannot connect to the Docker daemon` or similar Docker-related errors during deployment.
+
+**Solution**: Ensure Docker Desktop or Docker Engine is installed and running:
+
+```bash
+# Check if Docker is running
+docker info
+
+# On macOS/Windows: Start Docker Desktop
+# On Linux: Start Docker service
+sudo systemctl start docker
+```
+
+CDK needs Docker to bundle the Lambda dependencies layer (pandas, numpy, etc.) in a Linux-compatible format.
+
 ### Missing movie posters or descriptions
 Set the TMDB_API_KEY environment variable (see Configuration Management section above)
+
+### Provisioned concurrency deployment fails with "UnreservedConcurrentExecution below its minimum"
+
+**Problem**: Your AWS account has a Lambda concurrent execution limit that's too low (typically 10 for new accounts).
+
+**Solution**: Request a quota increase:
+
+```bash
+# Check current limit
+aws lambda get-account-settings --query 'AccountLimit.ConcurrentExecutions'
+
+# Request increase to 1000 (standard limit)
+aws service-quotas request-service-quota-increase \
+    --service-code lambda \
+    --quota-code L-B99A9384 \
+    --desired-value 1000
+```
+
+Approval typically takes 1-2 business days. In the meantime, use scheduled warming instead:
+
+```bash
+unset ENABLE_PROVISIONED_CONCURRENCY
+export ENABLE_WARMING=true
+cdk deploy MovieEngineAPIStack
+```
 
 ### Lambda timeout errors
 Increase timeout in `movie_engine_api_stack.py` (default 60s)
 
 ### Out of memory errors
 Increase Lambda memory in `movie_engine_api_stack.py` (default 3GB)
+
+### Frontend stack fails with "ResourceExistenceCheck" error
+
+**Error**: `Failed to create ChangeSet... AWS::EarlyValidation::ResourceExistenceCheck`
+
+**Problem**: The S3 bucket `movie-engine-frontend` already exists but wasn't created by the CloudFormation stack.
+
+**Solution**: Delete and recreate the bucket:
+
+```bash
+# Delete existing bucket
+aws s3 rb s3://movie-engine-frontend --force
+
+# Delete stuck changeset
+aws cloudformation delete-change-set --stack-name MovieEngineFrontendStack --change-set-name cdk-deploy-change-set
+
+# Redeploy
+cdk deploy MovieEngineFrontendStack
+```
 
 ### Frontend shows wrong API URL
 Rebuild and redeploy frontend:

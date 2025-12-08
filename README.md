@@ -86,7 +86,7 @@ movie-engine/
 
 ### Prerequisites
 
-- **Python 3.8+** for backend and data processing
+- **Python 3.13+** for backend and data processing
 - **Node.js 18+** and npm for frontend
 - **AWS Account** (optional, for cloud deployment)
 - **TMDB API Key** (optional but recommended) - [Get one free](https://www.themoviedb.org/settings/api)
@@ -144,7 +144,7 @@ App available at http://localhost:5173
 
 ### Cloud Deployment
 
-Deploy the complete stack to AWS:
+**Easiest Method:** Deploy the complete stack with one command:
 
 ```bash
 cd infra
@@ -155,21 +155,41 @@ pip install -r requirements.txt
 # Bootstrap CDK (first time only)
 cdk bootstrap
 
+# Run automated full deployment
+./deploy_all.sh
+```
+
+The script will prompt for your TMDB API key if not already set, then automatically:
+- Deploy backend API
+- Upload model files to S3
+- Deploy frontend infrastructure
+- Build and upload React app
+- Display URLs for both services
+
+**Manual Method:** Step-by-step deployment:
+
+```bash
+cd infra
+
+# Install and bootstrap
+pip install -r requirements.txt
+cdk bootstrap
+
 # Set TMDB API key
 export TMDB_API_KEY="your_api_key_here"
 
-# Deploy backend
-cdk deploy MovieEngineAPIStack
+# Deploy both stacks
+cdk deploy --all
 
 # Upload model files
 aws s3 sync ../movie-engine-data/models s3://movie-engine-data/models/
 aws s3 sync ../movie-engine-data/processed s3://movie-engine-data/processed/
 
-# Deploy frontend (auto-configures API URL)
+# Build and upload frontend
 ./deploy_frontend.sh
 ```
 
-See `infra/README.md` for detailed deployment documentation.
+See `infra/README.md` for detailed deployment options and troubleshooting.
 
 
 ## Component Documentation

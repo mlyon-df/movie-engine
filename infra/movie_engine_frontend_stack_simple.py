@@ -37,13 +37,16 @@ class MovieEngineFrontendStack(Stack):
         # ========================================
         # S3 Bucket for Frontend
         # ========================================
+        # CDK will create the bucket if it doesn't exist
+        # If it already exists and you own it, CloudFormation will adopt it
+        # The bucket is retained when the stack is deleted (RemovalPolicy.RETAIN)
         frontend_bucket = s3.Bucket(
             self,
             "FrontendBucket",
             bucket_name="movie-engine-frontend",
             versioned=False,
-            removal_policy=RemovalPolicy.DESTROY,
-            auto_delete_objects=True,  # Clean up when stack is deleted
+            removal_policy=RemovalPolicy.RETAIN,  # Keep bucket when stack is deleted
+            auto_delete_objects=False,  # Don't delete objects on stack deletion
             block_public_access=s3.BlockPublicAccess(
                 block_public_acls=False,
                 block_public_policy=False,
